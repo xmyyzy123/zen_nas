@@ -111,8 +111,8 @@ class AdaptiveAvgPool(PlainNetBasicBlockClass):
         return type(self).__name__ + f'({self.out_channels // self.output_size**2},{self.output_size})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|{self.out_channels // self.output_size ** 2},'\
-                                        f'{self.output_size})'
+        return type(self).__name__ + f'({self.block_name}|{self.out_channels // self.output_size ** 2},\
+                                        {self.output_size})'
 
     def get_output_resolution(self, input_resolution):
         return self.output_size
@@ -251,12 +251,12 @@ class ConvKX(PlainNetBasicBlockClass):
         return self.netblock(input_)
 
     def __str__(self):
-        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.kernel_size},'\
-                                        f'{self.stride})'
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.kernel_size},\
+                                        {self.stride})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|{self.in_channels},{self.out_channels},'\
-                                        f'{self.kernel_size},{self.stride})'
+        return type(self).__name__ + f'({self.block_name}|{self.in_channels},{self.out_channels},\
+                                        {self.kernel_size},{self.stride})'
 
     def get_output_resolution(self, input_resolution):
         return input_resolution // self.stride

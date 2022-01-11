@@ -36,12 +36,12 @@ class PlainNetSuperBlockClass(basic_blocks.PlainNetBasicBlockClass):
         return output
 
     def __str__(self):
-        return type(self).__name__ + f'({self.in_channels},{self.out_channels},'\
-                                        f'{self.stride},{self.sub_layers})'
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},\
+                                        {self.stride},{self.sub_layers})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|{self.in_channels},'\
-                                        f'{self.out_channels},{self.stride},{self.sub_layers})'
+        return type(self).__name__ + f'({self.block_name}|{self.in_channels},\
+                                        {self.out_channels},{self.stride},{self.sub_layers})'
 
     def get_output_resolution(self, input_resolution):
         resolution = input_resolution
@@ -157,13 +157,13 @@ class SuperConvKXBNRELU(PlainNetSuperBlockClass):
         return output
 
     def __str__(self):
-        return type(self).__name__ + f'({self.in_channels},{self.out_channels},'\
-                                        f'{self.stride},{self.sub_layers})'
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},\
+                                        {self.stride},{self.sub_layers})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},'\
-                                        f'stride={self.stride},sub_layers={self.sub_layers},'\
-                                        f'kernel_size={self.kernel_size})'
+        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},\
+                                        stride={self.stride},sub_layers={self.sub_layers},\
+                                        kernel_size={self.kernel_size})'
 
     def split(self, split_layer_threshold):
         """return str(self)"""
