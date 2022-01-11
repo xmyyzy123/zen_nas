@@ -111,13 +111,13 @@ class SuperResIDWEXKX(PlainNetSuperBlockClass):
             self.module_list = None
 
     def __str__(self):
-        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},\
-                                        {self.bottleneck_channels},{self.sub_layers})'
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},'\
+                                        f'{self.bottleneck_channels},{self.sub_layers})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},\
-                                        stride={self.stride},btl_channels={self.bottleneck_channels},\
-                                        sub_layers={self.sub_layers},kernel_size={self.kernel_size})'
+        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},'\
+                                        f'stride={self.stride},btl_channels={self.bottleneck_channels},'\
+                                        f'sub_layers={self.sub_layers},kernel_size={self.kernel_size})'
 
     def encode_structure(self):
         """pack channels and sub_layers to a list"""
