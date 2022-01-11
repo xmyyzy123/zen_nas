@@ -566,8 +566,8 @@ def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_t
             optimizer.step()
 
         if i % opt.print_freq == 0 and opt.rank == 0:
-            info_str = f'Train epoch={epoch}, i={i}, loss={float(loss):4g}, \
-                         acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%,lr={current_lr:4g}'
+            info_str = f'Train epoch={epoch}, i={i}, loss={float(loss):4g},' \
+                         f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%,lr={current_lr:4g}'
             logging.info(info_str)
 
     # if distributed, sync
@@ -630,8 +630,8 @@ def validate(val_loader, model, criterion, opt, epoch='N/A'):
             top5.update(float(acc5[0]), input_size)
 
             if i % opt.print_freq == 0 and opt.rank == 0:
-                info_str = f'Eval epoch={epoch}, i={i}, loss={float(loss):4g}, \
-                             acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%'
+                info_str = f'Eval epoch={epoch}, i={i}, loss={float(loss):4g},' \
+                             f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%'
                 logging.info(info_str)
 
     top1_acc_avg = top1.avg

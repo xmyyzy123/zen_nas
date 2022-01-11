@@ -771,10 +771,10 @@ def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_t
         if i % opt.print_freq == 0:
 
             print(
-                f'<rank {opt.rank}> Train epoch={epoch}, i={i}, loss={float(loss):4g}, \
-                  logit_loss={float(logit_loss):4g}, ts_feature_loss={float(ts_feature_loss):4g}, \
-                  ts_logit_loss={float(ts_logit_loss):4g}, \
-                  acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%, lr={current_lr:4g}')
+                f'<rank {opt.rank}> Train epoch={epoch}, i={i}, loss={float(loss):4g},' \
+                  f'logit_loss={float(logit_loss):4g}, ts_feature_loss={float(ts_feature_loss):4g},' \
+                  f'ts_logit_loss={float(ts_logit_loss):4g},' \
+                  f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%, lr={current_lr:4g}')
 
     top1_acc_avg = top1.avg
     top5_acc_avg = top5.avg
@@ -853,8 +853,8 @@ def validate(val_loader, model, criterion, opt, epoch='N/A'):
             top5.update(float(acc5[0]), input_size)
 
             if i % opt.print_freq == 0:
-                print(f'<rank {opt.rank}> Eval epoch={epoch}, i={i},\
-                        loss={float(loss):4g}, acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%')
+                print(f'<rank {opt.rank}> Eval epoch={epoch}, i={i},'\
+                        f'loss={float(loss):4g}, acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%')
 
     top1_acc_avg = top1.avg
     top5_acc_avg = top5.avg

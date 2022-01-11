@@ -117,11 +117,11 @@ if __name__ == '__main__':
             num += input_.shape[0]
 
             if i % 100 == 0:
-                print(f'mini_batch {i}, top-1 acc={acc1[0]:4g}%, top-5 acc={acc5[0]:4g}%, \
-                      number of evaluated images={num}')
+                print(f'mini_batch {i}, top-1 acc={acc1[0]:4g}%, top-5 acc={acc5[0]:4g}%,' \
+                      f'number of evaluated images={num}')
 
     acc1_avg = acc1_sum / num
     acc5_avg = acc5_sum / num
 
-    print(f'*** arch={opt.arch}, validation top-1 acc={acc1_avg}%, top-5 acc={acc5_avg}%, \
-          number of evaluated images={num}')
+    print(f'*** arch={opt.arch}, validation top-1 acc={acc1_avg}%, top-5 acc={acc5_avg}%,' \
+          f'number of evaluated images={num}')

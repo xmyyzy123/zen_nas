@@ -148,7 +148,7 @@ def get_random_initialized_structure_str():
             sub_layer = 1
 
             block = get_random_block()
-            struct_str += block.__name__ + f'({input_channel},{out_channel},\
-                                     {stride},{bottleneck_channel},{sub_layer})'
+            struct_str += block.__name__ + f'({input_channel},{out_channel},'\
+                                     f'{stride},{bottleneck_channel},{sub_layer})'
             input_channel = out_channel
     return struct_str

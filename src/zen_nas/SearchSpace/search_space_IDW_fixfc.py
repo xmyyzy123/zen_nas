@@ -98,9 +98,9 @@ def gen_search_space(block_list, block_id):
             student_out_channels_list = get_select_student_channels_list(the_block.out_channels)
 
         for student_out_channels in student_out_channels_list:
-            tmp_block_str = type(the_block).__name__ + f'({the_block.in_channels},\
-                                                          {student_out_channels},\
-                                                          {the_block.stride},1)'
+            tmp_block_str = type(the_block).__name__ + f'({the_block.in_channels},'\
+                                                          f'{student_out_channels},'\
+                                                          f'{the_block.stride},1)'
             student_blocks_list.append(tmp_block_str)
         student_blocks_list = list(set(student_blocks_list))
         assert len(student_blocks_list) >= 1
@@ -127,9 +127,9 @@ def gen_search_space(block_list, block_id):
                         continue
                     if student_sublayers <= 0:  # no empty layer
                         continue
-                    tmp_block_str = student_block_type.__name__ + f'({the_block.in_channels},{student_out_channels},\
-                                                                     {the_block.stride},{student_bottleneck_channels},\
-                                                                     {student_sublayers})'
+                    tmp_block_str = student_block_type.__name__ + f'({the_block.in_channels},{student_out_channels},'\
+                                                                     f'{the_block.stride},{student_bottleneck_channels},'\
+                                                                     f'{student_sublayers})'
                     student_blocks_list.append(tmp_block_str)
                 student_blocks_list = list(set(student_blocks_list))
                 assert len(student_blocks_list) >= 1

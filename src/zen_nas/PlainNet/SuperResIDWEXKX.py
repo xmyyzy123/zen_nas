@@ -111,13 +111,13 @@ class SuperResIDWEXKX(PlainNetSuperBlockClass):
             self.module_list = None
 
     def __str__(self):
-        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},\
-                                        {self.bottleneck_channels},{self.sub_layers})'
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},'\
+                                        f'{self.bottleneck_channels},{self.sub_layers})'
 
     def __repr__(self):
-        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},\
-                                        stride={self.stride},btl_channels={self.bottleneck_channels},\
-                                        sub_layers={self.sub_layers},kernel_size={self.kernel_size})'
+        return type(self).__name__ + f'({self.block_name}|in={self.in_channels},out={self.out_channels},'\
+                                        f'stride={self.stride},btl_channels={self.bottleneck_channels},'\
+                                        f'sub_layers={self.sub_layers},kernel_size={self.kernel_size})'
 
     def encode_structure(self):
         """pack channels and sub_layers to a list"""
@@ -130,10 +130,10 @@ class SuperResIDWEXKX(PlainNetSuperBlockClass):
         if self.sub_layers >= split_layer_threshold:
             new_sublayers_1 = split_layer_threshold // 2
             new_sublayers_2 = self.sub_layers - new_sublayers_1
-            new_block_str1 = type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},\
-                                                      {self.bottleneck_channels},{new_sublayers_1})'
-            new_block_str2 = type(self).__name__ + f'({self.out_channels},{self.out_channels},{1},\
-                                                      {self.bottleneck_channels},{new_sublayers_2})'
+            new_block_str1 = type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.stride},'\
+                                                      f'{self.bottleneck_channels},{new_sublayers_1})'
+            new_block_str2 = type(self).__name__ + f'({self.out_channels},{self.out_channels},{1},'\
+                                                      f'{self.bottleneck_channels},{new_sublayers_2})'
             return new_block_str1 + new_block_str2
         return str(self)
 
@@ -149,8 +149,8 @@ class SuperResIDWEXKX(PlainNetSuperBlockClass):
         new_bottleneck_channels = global_utils.smart_round(self.bottleneck_channels * channel_scale)
         new_sub_layers = max(1, round(self.sub_layers * sub_layer_scale))
 
-        return type(self).__name__ + f'({self.in_channels},{new_out_channels},{self.stride},\
-                                        {new_bottleneck_channels},{new_sub_layers})'
+        return type(self).__name__ + f'({self.in_channels},{new_out_channels},{self.stride},'\
+                                        f'{new_bottleneck_channels},{new_sub_layers})'
 
     # pylint: disable=arguments-differ
     @classmethod
