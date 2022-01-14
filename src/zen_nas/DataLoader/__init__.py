@@ -48,16 +48,16 @@ params_dict = {
         'num_classes': 100,
     },
     'cifar10': {
-        'train_dir': os.path.expanduser('~/data/pytorch_cifar10'),
-        'val_dir': os.path.expanduser('~/data/pytorch_cifar10'),
+        'train_dir': os.path.expanduser('/home/ouc/Documents/Ding/datasets/cifar-10-python'),
+        'val_dir': os.path.expanduser('/home/ouc/Documents/Ding/datasets/cifar-10-python'),
         'num_train_samples': 50000,
         'num_val_samples': 10000,
         'num_classes': 10,
     },
 
     'cifar100': {
-        'train_dir': os.path.expanduser('~/data/pytorch_cifar100'),
-        'val_dir': os.path.expanduser('~/data/pytorch_cifar100'),
+        'train_dir': os.path.expanduser('/home/ouc/Documents/Ding/datasets/cifar-100-python'),
+        'val_dir': os.path.expanduser('/home/ouc/Documents/Ding/datasets/cifar-100-python'),
         'num_train_samples': 50000,
         'num_val_samples': 10000,
         'num_classes': 100,
@@ -243,7 +243,7 @@ def load_cifar_like(dataset_name, set_name, train_augment, random_erase, auto_au
     transformer = transforms.Compose(transform_list)
 
     if dataset_name == 'cifar10':
-        the_dataset = datasets.CIFAR10(root=data_dir, train=set_name == 'train', download=True, transform=transformer)
+        the_dataset = datasets.CIFAR10(root=data_dir, train=set_name == 'train', download=False, transform=transformer)
     elif dataset_name == 'cifar100':
         the_dataset = datasets.CIFAR100(root=data_dir, train=set_name == 'train', download=True, transform=transformer)
     else:

@@ -68,7 +68,7 @@ class MasterNet(PlainNet.PlainNet):
         self.no_reslink = no_reslink
         self.no_BN = no_BN
         self.use_se = use_se
-        self.module_list = None
+        #self.module_list = None
 
         # bn eps
         for layer in self.modules():
@@ -108,6 +108,9 @@ class MasterNet(PlainNet.PlainNet):
         """compute output before global averag pool"""
         output = input_
         for the_block in self.block_list:
+            # for i in the_block.state_dict():
+            #     print(i)
+            # s = next(the_block.parameters()).device
             output = the_block(output)
         return output
 
