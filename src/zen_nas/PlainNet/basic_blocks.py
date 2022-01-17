@@ -11,6 +11,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
+import math
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from PlainNet import _get_right_parentheses_index_, _create_netblock_list_from_str_
@@ -90,6 +92,314 @@ class PlainNetBasicBlockClass(nn.Module):
         if struct_str.startswith(cls.__name__ + '(') and struct_str[-1] == ')':
             return True
         return False
+
+
+class GhostConv(PlainNetBasicBlockClass):
+    def __init__(self, in_channels=None, out_channels=None, kernel_size=1, ratio=2, dw_size=3, 
+                stride=1, copy_from=None, relu=None, no_create=False, **kwargs):
+        super().__init__(**kwargs)
+        self.no_create = no_create
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.dw_size = dw_size
+        self.relu = relu
+        self.init_channels = math.ceil(out_channels / ratio)
+        self.new_channels = self.init_channels * (ratio - 1)
+
+        if no_create or self.in_channels == 0 or self.out_channels == 0 or self.kernel_size == 0 \
+                or self.stride == 0:
+            return
+
+        self.primary_conv = nn.Sequential(
+            nn.Conv2d(self.in_channels, self.init_channels, self.kernel_size, self.stride, self.kernel_size//2, bias=False),
+            # nn.BatchNorm2d(self.init_channels),
+            # nn.ReLU(inplace=True) if self.relu else nn.Sequential(),
+        )
+
+        self.cheap_operation = nn.Sequential(
+            nn.Conv2d(self.init_channels, self.new_channels, self.dw_size, 1, self.dw_size//2, groups=self.init_channels, bias=False),
+            # nn.BatchNorm2d(self.new_channels),
+            # nn.ReLU(inplace=True) if self.relu else nn.Sequential(),
+        )
+
+    def forward(self, x):
+        x1 = self.primary_conv(x)
+        x2 = self.cheap_operation(x1)
+        out = torch.cat([x1, x2], dim=1)
+        t = self.out_channels
+        return out[:, :self.out_channels, :, :]
+
+    def __str__(self):
+        return type(self).__name__ + f'({self.in_channels},{self.out_channels},{self.kernel_size},'\
+                                        f'{self.stride})'
+
+    def __repr__(self):
+        return type(self).__name__ + f'({self.block_name}|{self.in_channels},{self.out_channels},'\
+                                        f'{self.kernel_size},{self.stride})'
+
+    def get_output_resolution(self, input_resolution):
+        return input_resolution // self.stride
+
+    def get_FLOPs(self, input_resolution):
+        return self.in_channels * self.init_channels * self.kernel_size ** 2 * \
+            input_resolution ** 2 // self.stride ** 2  + \
+               self.init_channels * self.new_channels * self.dw_size ** 2 * \
+            input_resolution ** 2 // self.init_channels
+
+    def get_model_size(self):
+        return self.in_channels * self.init_channels * self.kernel_size ** 2  + \
+                self.init_channels * self.new_channels * self.dw_size ** 2 // self.init_channels
+                
+    def set_in_channels(self, channels):
+        self.in_channels = channels
+        if not self.no_create:
+            self.primary_conv = nn.Sequential(
+                nn.Conv2d(self.in_channels, self.init_channels, self.kernel_size, self.stride, self.kernel_size//2, bias=False),
+                # nn.BatchNorm2d(self.init_channels),
+                # nn.ReLU(inplace=True) if self.relu else nn.Sequential(),
+            )
+
+            self.cheap_operation = nn.Sequential(
+                nn.Conv2d(self.init_channels, self.new_channels, self.dw_size, 1, self.dw_size//2, groups=self.init_channels, bias=False),
+                # nn.BatchNorm2d(self.new_channels),
+                # nn.ReLU(inplace=True) if self.relu else nn.Sequential(),
+            )
+            self.primary_conv.train()
+            self.cheap_operation.train()
+            self.primary_conv.requires_grad_(True)
+            self.cheap_operation.requires_grad_(True)
+
+    @classmethod
+    def create_from_str(cls, struct_str, no_create=False, **kwargs):
+        assert cls.is_instance_from_str(struct_str)
+        idx = _get_right_parentheses_index_(struct_str)
+        assert idx is not None
+        param_str = struct_str[len(cls.__name__ + '('):idx]
+        # find block_name
+        tmp_idx = param_str.find('|')
+        if tmp_idx < 0:
+            tmp_block_name = f'uuid{uuid.uuid4().hex}'
+        else:
+            tmp_block_name = param_str[0:tmp_idx]
+            param_str = param_str[tmp_idx + 1:]
+
+        split_str = param_str.split(',')
+        in_channels = int(split_str[0])
+        out_channels = int(split_str[1])
+        kernel_size = int(split_str[2])
+        stride = int(split_str[3])
+        #relu = True if str(split_str[4]) == 'relu' else False
+        return GhostConv(in_channels=in_channels, out_channels=out_channels,
+                   kernel_size=kernel_size, stride=stride, no_create=no_create,
+                   block_name=tmp_block_name), struct_str[idx + 1:]
+
+class GhostShuffleBlock(PlainNetBasicBlockClass):
+    def __init__(self, block_list, in_channels=None, stride=None,
+                 kernel_size=None, no_create=False, **kwargs):
+        super().__init__(**kwargs)
+        self.block_list = block_list
+        self.stride = stride
+        self.no_create = no_create
+        if not no_create:
+            self.module_list = nn.ModuleList(block_list)
+
+        if in_channels is None:
+            if self.stride == 1:
+                self.in_channels = block_list[0].in_channels * 2
+            else:
+                self.in_channels = block_list[0].in_channels
+        else:
+            self.in_channels = in_channels * 2
+
+        if self.stride == 1:
+            self.mid_channels = self.in_channels // 2
+        else:
+            self.mid_channels = self.in_channels
+        self.out_channels = block_list[-1].out_channels * 2
+
+        self.kernel_size = kernel_size
+
+        if self.stride is None:
+            tmp_input_res = 1024
+            tmp_output_res = self.get_output_resolution(tmp_input_res)
+            self.stride = tmp_input_res // tmp_output_res
+        assert self.stride in [1, 2]
+
+        # Depth-wise convolution
+        self.proj = None
+        if self.stride > 1:
+            self.proj = nn.Sequential(
+                    nn.Conv2d(self.mid_channels, self.mid_channels, self.kernel_size, stride=self.stride,
+                        padding=(self.kernel_size-1)//2, groups=self.mid_channels, bias=False),
+                    nn.BatchNorm2d(self.mid_channels),
+                    GhostConv(self.mid_channels, self.out_channels // 2),
+                    nn.BatchNorm2d(self.out_channels // 2),
+                    nn.ReLU(),
+            )
+        else:
+            self.proj = nn.Sequential(
+                    GhostConv(self.mid_channels, self.out_channels // 2),
+                    nn.BatchNorm2d(self.out_channels // 2),
+                    nn.ReLU(),
+            )            
+        # self.afterconcat = nn.Sequential(
+        #     GhostConv(self.out_channels, self.out_channels),
+        #     nn.BatchNorm2d(self.out_channels),
+        #     nn.ReLU(),
+        # )
+
+    def forward(self, x):
+        if len(self.block_list) == 0:
+            return x
+        
+        if self.stride == 1:
+            x1 = x[:, :(x.shape[1]//2), :, :]
+            x2 = x[:, (x.shape[1]//2):, :, :]
+            output = x2
+            for inner_block in self.block_list:
+                output = inner_block(output)
+            x_proj = self.proj(x1)
+            x = torch.cat((x_proj, output), 1)
+        else:
+            x_proj = x
+            output = x
+            for inner_block in self.block_list:
+                output = inner_block(output)
+            x = torch.cat((self.proj(x_proj), output), 1)
+
+        #x = self.afterconcat(x)
+        return x
+
+    # def channel_shuffle(self, x):
+    #     batchsize, num_channels, height, width = x.data.size()
+    #     assert (num_channels % 4 == 0)
+    #     x = x.reshape(batchsize * num_channels // 2, 2, height * width)
+    #     x = x.permute(1, 0, 2)
+    #     x = x.reshape(2, -1, num_channels // 2, height, width)
+    #     return x[0], x[1]
+
+    def __str__(self):
+        block_str = f'GhostShuffleBlock({self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str
+
+    def __repr__(self):
+        block_str = f'GhostShuffleBlock({self.block_name}|{self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str
+
+    def get_output_resolution(self, input_resolution):
+        the_res = input_resolution
+        for the_block in self.block_list:
+            the_res = the_block.get_output_resolution(the_res)
+
+        return the_res
+
+    def get_FLOPs(self, input_resolution):
+        the_res = input_resolution
+        the_flops = 0
+        for the_block in self.block_list:
+            the_flops += the_block.get_FLOPs(the_res)
+            the_res = the_block.get_output_resolution(the_res)
+
+        if self.stride > 1:
+            the_flops += self.mid_channels * self.mid_channels * self.kernel_size ** 2 * (the_res / self.stride) ** 2 + \
+                self.mid_channels * self.out_channels // 4 * the_res ** 2  + \
+                self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 * \
+                the_res ** 2 // (self.out_channels // 4)
+        else:
+            the_flops += self.mid_channels * self.out_channels // 4 * the_res ** 2  + \
+                self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 * \
+                the_res ** 2 // (self.out_channels // 4)
+
+        # the_flops += self.out_channels / 2 * self.out_channels / 2 * the_res ** 2  + \
+        #        self.out_channels / 2 * self.out_channels / 2 * 3 ** 2 * \
+        #         the_res ** 2 // self.out_channels
+
+        return the_flops
+        
+    def get_model_size(self):
+        the_size = 0
+        for the_block in self.block_list:
+            the_size += the_block.get_model_size()
+
+        if self.stride > 1:
+            the_size += self.mid_channels * self.mid_channels * self.kernel_size ** 2 + \
+                self.mid_channels * self.out_channels // 4 + self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 // (self.out_channels // 4)
+        else:
+            the_size += self.mid_channels * self.out_channels // 4 + self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 // (self.out_channels // 4)
+        return the_size
+
+    def set_in_channels(self, channels):
+        self.in_channels = channels
+        self.mid_channels = channels // 2
+        if not self.no_create:
+            if self.stride > 1:
+                self.proj = nn.Sequential(
+                        nn.Conv2d(self.mid_channels, self.mid_channels, self.kernel_size, stride=self.stride,
+                            padding=(self.kernel_size-1)//2, groups=self.mid_channels, bias=False),
+                        nn.BatchNorm2d(self.mid_channels),
+                        GhostConv(self.mid_channels, self.out_channels // 2),
+                        nn.BatchNorm2d(self.out_channels // 2),
+                        nn.ReLU(),
+                )
+            else:
+                self.proj = nn.Sequential(
+                        GhostConv(self.mid_channels, self.out_channels // 2),
+                        nn.BatchNorm2d(self.out_channels // 2),
+                        nn.ReLU(),
+                )   
+            self.proj.train()
+            self.proj.requires_grad_(True)
+
+    @classmethod
+    def create_from_str(cls, struct_str, no_create=False, **kwargs):
+        assert cls.is_instance_from_str(struct_str)
+        idx = _get_right_parentheses_index_(struct_str)
+        assert idx is not None
+        the_stride = None
+        param_str = struct_str[len(cls.__name__ + '('):idx]
+        # find block_name
+        tmp_idx = param_str.find('|')
+        if tmp_idx < 0:
+            tmp_block_name = f'uuid{uuid.uuid4().hex}'
+        else:
+            tmp_block_name = param_str[0:tmp_idx]
+            param_str = param_str[tmp_idx + 1:]
+
+        first_comma_index = param_str.find(',')
+        # cannot parse in_channels, missing, use default
+        if first_comma_index < 0 or not param_str[0:first_comma_index].isdigit():
+            in_channels = None
+            the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+        else:
+            in_channels = int(param_str[0:first_comma_index])
+            param_str = param_str[first_comma_index + 1:]
+            second_comma_index = param_str.find(',')
+            if second_comma_index < 0 or not param_str[0:second_comma_index].isdigit():
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+            else:
+                the_stride = int(param_str[0:second_comma_index])
+                param_str = param_str[second_comma_index + 1:]
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+
+        assert len(remaining_s) == 0
+        if the_block_list is None or len(the_block_list) == 0:
+            return None, struct_str[idx + 1:]
+        for block in the_block_list:
+            if isinstance(block, ConvDW):
+                kernel_size = block.kernel_size
+        return cls(block_list=the_block_list, in_channels=in_channels,
+                   kernel_size=kernel_size, stride=the_stride, no_create=no_create,
+                   block_name=tmp_block_name), struct_str[idx + 1:]
 
 
 class AdaptiveAvgPool(PlainNetBasicBlockClass):
@@ -1507,6 +1817,8 @@ def _fuse_bn_layer_for_blocks_list_(block_list):
 def register_netblocks_dict(netblocks_dict: dict):
     """add all basic layer classes to dict"""
     this_py_file_netblocks_dict = {
+        'GhostConv': GhostConv,
+        'GhostShuffleBlock': GhostShuffleBlock,
         'AdaptiveAvgPool': AdaptiveAvgPool,
         'BN': BN,
         'ConvDW': ConvDW,

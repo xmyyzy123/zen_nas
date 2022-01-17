@@ -153,7 +153,7 @@ def compute_nas_score(any_plain_net, random_structure_str, gpu, args):
     """
     # compute network zero-shot proxy score
     the_model = any_plain_net(num_classes=args.num_classes, plainnet_struct=random_structure_str,
-                              no_create=False, no_reslink=True)
+                              no_create=False, no_reslink=False)
     the_model = the_model.cuda(gpu)
     try:
         if args.zero_shot_score == 'Zen':
@@ -164,13 +164,13 @@ def compute_nas_score(any_plain_net, random_structure_str, gpu, args):
             the_nas_core = the_nas_core_info['avg_nas_score']
         elif args.zero_shot_score == 'TE-NAS':
             the_nas_core = compute_te_nas_score.compute_NTK_score(model=the_model, gpu=gpu,
-                                                                  resolution=args.input_image_size,
-                                                                  batch_size=args.batch_size)
+                                                                    resolution=args.input_image_size,
+                                                                    batch_size=args.batch_size)
 
         elif args.zero_shot_score == 'Syncflow':
             the_nas_core = compute_syncflow_score.do_compute_nas_score(model=the_model, gpu=gpu,
-                                                                       resolution=args.input_image_size,
-                                                                       batch_size=args.batch_size)
+                                                                        resolution=args.input_image_size,
+                                                                        batch_size=args.batch_size)
 
         elif args.zero_shot_score == 'GradNorm':
             the_nas_core = compute_gradnorm_score.compute_nas_score(model=the_model, gpu=gpu,
@@ -188,8 +188,8 @@ def compute_nas_score(any_plain_net, random_structure_str, gpu, args):
 
         elif args.zero_shot_score == 'NASWOT':
             the_nas_core = compute_NASWOT_score.compute_nas_score(gpu=gpu, model=the_model,
-                                                                  resolution=args.input_image_size,
-                                                                  batch_size=args.batch_size)
+                                                                    resolution=args.input_image_size,
+                                                                    batch_size=args.batch_size)
     except Exception as err:  # pylint: disable=broad-except
         logging.info(str(err))
         logging.info('--- Failed structure: ')
