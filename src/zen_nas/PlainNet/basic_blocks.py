@@ -312,13 +312,11 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
 
         if self.stride > 1:
             the_flops += self.mid_channels * self.mid_channels * self.kernel_size ** 2 * (the_res / self.stride) ** 2 + \
-                self.mid_channels * self.out_channels // 4 * the_res ** 2  + \
-                self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 * \
-                the_res ** 2 // (self.out_channels // 4)
+                self.mid_channels * (self.out_channels // 4) * the_res ** 2  + \
+                (self.out_channels // 4)  * 3 ** 2 * the_res ** 2 
         else:
-            the_flops += self.mid_channels * self.out_channels // 4 * the_res ** 2  + \
-                self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 * \
-                the_res ** 2 // (self.out_channels // 4)
+            the_flops += self.mid_channels * (self.out_channels // 4) * the_res ** 2  + \
+                (self.out_channels // 4) * 3 ** 2 * the_res ** 2
 
         # the_flops += self.out_channels / 2 * self.out_channels / 2 * the_res ** 2  + \
         #        self.out_channels / 2 * self.out_channels / 2 * 3 ** 2 * \
@@ -333,9 +331,9 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
 
         if self.stride > 1:
             the_size += self.mid_channels * self.mid_channels * self.kernel_size ** 2 + \
-                self.mid_channels * self.out_channels // 4 + self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 // (self.out_channels // 4)
+                self.mid_channels * (self.out_channels // 4) + (self.out_channels // 4) * 3 ** 2
         else:
-            the_size += self.mid_channels * self.out_channels // 4 + self.out_channels // 4 * self.out_channels // 4 * 3 ** 2 // (self.out_channels // 4)
+            the_size += self.mid_channels * (self.out_channels // 4) + (self.out_channels // 4) * 3 ** 2
         return the_size
 
     def set_in_channels(self, channels):

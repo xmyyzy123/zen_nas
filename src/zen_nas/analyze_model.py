@@ -19,10 +19,10 @@ def main(opt, argv):
     """get model flops and parameters"""
     model = ModelLoader.get_model(opt, argv)
     flops, params = get_model_complexity_info(model, (3, opt.input_image_size, opt.input_image_size),
-                                              as_strings=False,
+                                              as_strings=True,
                                               print_per_layer_stat=True)
-    print(f'Flops:  {flops:4g}')
-    print(f'Params: {params:4g}')
+
+    print("%s |flops: %s |params: %s" % (model.__class__.__name__, flops, params))
 
 
 def get_flops_params(opt):

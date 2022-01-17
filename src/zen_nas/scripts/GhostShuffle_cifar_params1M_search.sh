@@ -37,7 +37,8 @@ python analyze_model.py \
   --input_image_size 32 \
   --num_classes 10 \
   --arch Masternet.py:MasterNet \
-  --plainnet_struct_txt ${save_dir}/best_structure.txt
+  --plainnet_struct_txt ${save_dir}/best_structure.txt \
+  > ${save_dir}/analyze_model.txt
 
 # python train_image_classification.py --dataset cifar10 --num_classes 10 \
 #   --dist_mode single --workers_per_gpu 6 \
