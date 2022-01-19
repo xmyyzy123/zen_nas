@@ -11,7 +11,7 @@ population_size=512
 evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 
 
-save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M_channelshuffle
+save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M
 mkdir -p ${save_dir}
 
 echo "SuperConvK3BNRELU(3,8,1,1)SuperGhostShuffleK3(8,16,1,8,1)SuperGhostShuffleK3(16,32,2,16,1)SuperGhostShuffleK3(32,64,2,32,1)SuperGhostShuffleK3(64,64,2,32,1)SuperConvK1BNRELU(64,128,1,1)" \
