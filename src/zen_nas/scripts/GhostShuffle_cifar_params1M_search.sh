@@ -5,12 +5,13 @@ set -e
 cd ../
 
 budget_model_size=1e6
+budget_flops=160e6
 max_layers=18
 population_size=512
 evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 
 
-save_dir=../../save_dir/GhostShuffle_cifar_params1M
+save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M_channelshuffle
 mkdir -p ${save_dir}
 
 echo "SuperConvK3BNRELU(3,8,1,1)SuperGhostShuffleK3(8,16,1,8,1)SuperGhostShuffleK3(16,32,2,16,1)SuperGhostShuffleK3(32,64,2,32,1)SuperGhostShuffleK3(64,64,2,32,1)SuperConvK1BNRELU(64,128,1,1)" \
@@ -22,6 +23,7 @@ python evolution_search.py --gpu 0 \
   --origin \
   --search_space SearchSpace/search_space_ghostshuffle.py \
   --budget_model_size ${budget_model_size} \
+  --budget_flops ${budget_flops} \
   --max_layers ${max_layers} \
   --batch_size 64 \
   --use_se \

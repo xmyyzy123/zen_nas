@@ -11,10 +11,10 @@ evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 resolution=32
 epochs=1440
 
-save_dir=../../save_dir/GhostShuffle_cifar_params1M
+save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M
 mkdir -p ${save_dir}
 
-horovodrun -np 4 -H localhost:8 python train_image_classification.py --dataset cifar10 --num_classes 10 \
+horovodrun -np 4 -H localhost:4 python train_image_classification.py --dataset cifar10 --num_classes 10 \
   --dist_mode horovod --workers_per_gpu 6 --sync_bn \
   --input_image_size ${resolution} --epochs ${epochs} --warmup 5 \
   --optimizer sgd --bn_momentum 0.01 --wd 4e-5 --nesterov --weight_init custom \

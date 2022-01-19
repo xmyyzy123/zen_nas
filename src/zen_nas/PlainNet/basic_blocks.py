@@ -202,6 +202,7 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
         self.block_list = block_list
         self.stride = stride
         self.no_create = no_create
+        self.group = 2 # group = 2
         if not no_create:
             self.module_list = nn.ModuleList(block_list)
 
@@ -262,6 +263,7 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
                 output = inner_block(output)
             x_proj = self.proj(x1)
             x = torch.cat((x_proj, output), 1)
+            #x = self.channel_shuffle(x)
         else:
             x_proj = x
             output = x
@@ -269,9 +271,9 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
                 output = inner_block(output)
             x = torch.cat((self.proj(x_proj), output), 1)
 
-        #x = self.afterconcat(x)
         return x
 
+    # # shufflenetv2
     # def channel_shuffle(self, x):
     #     batchsize, num_channels, height, width = x.data.size()
     #     assert (num_channels % 4 == 0)
@@ -279,6 +281,18 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
     #     x = x.permute(1, 0, 2)
     #     x = x.reshape(2, -1, num_channels // 2, height, width)
     #     return x[0], x[1]
+
+    # shufflenetv1
+    def channel_shuffle(self, x):
+        batchsize, num_channels, height, width = x.data.size()
+        assert num_channels % self.group == 0
+        group_channels = num_channels // self.group
+
+        x = x.reshape(batchsize, group_channels, self.group, height, width)
+        x = x.permute(0, 2, 1, 3, 4)
+        x = x.reshape(batchsize, num_channels, height, width)
+
+        return x
 
     def __str__(self):
         block_str = f'GhostShuffleBlock({self.in_channels},{self.stride},'
