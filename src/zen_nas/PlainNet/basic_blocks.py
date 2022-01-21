@@ -263,7 +263,7 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
                 output = inner_block(output)
             x_proj = self.proj(x1)
             x = torch.cat((x_proj, output), 1)
-            #x = self.channel_shuffle(x)
+            x = self.channel_shuffle(x)
         else:
             x_proj = x
             output = x
@@ -361,13 +361,13 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
                         nn.BatchNorm2d(self.mid_channels),
                         GhostConv(self.mid_channels, self.out_channels // 2),
                         nn.BatchNorm2d(self.out_channels // 2),
-                        nn.ReLU(),
+                        HSwish(),
                 )
             else:
                 self.proj = nn.Sequential(
                         GhostConv(self.mid_channels, self.out_channels // 2),
                         nn.BatchNorm2d(self.out_channels // 2),
-                        nn.ReLU(),
+                        HSwish(),
                 )   
             self.proj.train()
             self.proj.requires_grad_(True)
@@ -413,6 +413,62 @@ class GhostShuffleBlock(PlainNetBasicBlockClass):
                    kernel_size=kernel_size, stride=the_stride, no_create=no_create,
                    block_name=tmp_block_name), struct_str[idx + 1:]
 
+class HSwish(nn.Module):
+
+	def __init__(self):
+		super(HSwish, self).__init__()
+
+	def forward(self, inputs):
+		clip = torch.clamp(inputs + 3, 0, 6) / 6
+		return inputs * clip
+
+class HS(PlainNetBasicBlockClass):
+
+    def __init__(self, out_channels, no_create=False, **kwargs):
+        super().__init__(**kwargs)
+        self.in_channels = out_channels
+        self.out_channels = out_channels
+        self.no_create = no_create
+
+    def forward(self, inputs):
+        clip = torch.clamp(inputs + 3, 0, 6) / 6
+        return inputs * clip
+
+    def __str__(self):
+        return f'HS({self.out_channels})'
+
+    def __repr__(self):
+        return f'HS({self.block_name}|{self.out_channels})'
+
+    def get_output_resolution(self, input_resolution):
+        return input_resolution
+
+    def get_FLOPs(self, input_resolution):
+        return 0
+
+    def get_model_size(self):
+        return 0
+
+    def set_in_channels(self, channels):
+        self.in_channels = channels
+        self.out_channels = channels
+
+    @classmethod
+    def create_from_str(cls, struct_str, no_create=False, **kwargs):
+        assert HS.is_instance_from_str(struct_str)
+        idx = _get_right_parentheses_index_(struct_str)
+        assert idx is not None
+        param_str = struct_str[len('HS('):idx]
+        # find block_name
+        tmp_idx = param_str.find('|')
+        if tmp_idx < 0:
+            tmp_block_name = f'uuid{uuid.uuid4().hex}'
+        else:
+            tmp_block_name = param_str[0:tmp_idx]
+            param_str = param_str[tmp_idx + 1:]
+
+        out_channels = int(param_str)
+        return HS(out_channels=out_channels, no_create=no_create, block_name=tmp_block_name), struct_str[idx + 1:]
 
 class AdaptiveAvgPool(PlainNetBasicBlockClass):
     """Adaptive average pool layer"""
@@ -1583,7 +1639,7 @@ class SE(PlainNetBasicBlockClass):
             nn.Conv2d(in_channels=self.out_channels, out_channels=self.se_channels, kernel_size=1, stride=1,
                       padding=0, bias=False),
             nn.BatchNorm2d(self.se_channels),
-            nn.ReLU(),
+            HSwish(),
             nn.Conv2d(in_channels=self.se_channels, out_channels=self.out_channels, kernel_size=1, stride=1,
                       padding=0, bias=False),
             nn.BatchNorm2d(self.out_channels),
@@ -1592,6 +1648,7 @@ class SE(PlainNetBasicBlockClass):
 
     def forward(self, input_):
         se_x = self.netblock(input_)
+        #se_x = torch.clamp(se_x + 3, 0, 6) / 6
         return se_x * input_
 
     def __str__(self):
@@ -1619,7 +1676,7 @@ class SE(PlainNetBasicBlockClass):
                 nn.Conv2d(in_channels=self.out_channels, out_channels=self.se_channels, kernel_size=1, stride=1,
                           padding=0, bias=False),
                 nn.BatchNorm2d(self.se_channels),
-                nn.ReLU(),
+                HSwish(),
                 nn.Conv2d(in_channels=self.se_channels, out_channels=self.out_channels, kernel_size=1, stride=1,
                           padding=0, bias=False),
                 nn.BatchNorm2d(self.out_channels),
@@ -1831,6 +1888,7 @@ def register_netblocks_dict(netblocks_dict: dict):
     this_py_file_netblocks_dict = {
         'GhostConv': GhostConv,
         'GhostShuffleBlock': GhostShuffleBlock,
+        'HS': HS,
         'AdaptiveAvgPool': AdaptiveAvgPool,
         'BN': BN,
         'ConvDW': ConvDW,

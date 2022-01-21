@@ -19,9 +19,9 @@ except ImportError:
 def main(opt, argv):
     """get model flops and parameters"""
     model = ModelLoader.get_model(opt, argv)
-    for m in model.modules():
-        print(m)
-    d = torch.rand(1, 3, opt.input_image_size, opt.input_image_size)
+    # for m in model.modules():
+    #     print(m)
+    # d = torch.rand(1, 3, opt.input_image_size, opt.input_image_size)
     #torch.onnx.export(model, d, "./model_viz.onnx", opset_version=10)
     flops, params = get_model_complexity_info(model, (3, opt.input_image_size, opt.input_image_size),
                                               as_strings=True,

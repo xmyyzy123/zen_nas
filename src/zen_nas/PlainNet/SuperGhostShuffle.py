@@ -53,7 +53,7 @@ class SuperGhostShuffleKX(PlainNetSuperBlockClass):
             if not self.no_BN:
                 inner_str += f'BN({self.bottleneck_channels})'
             if not self.no_relu:
-                inner_str += f'RELU({self.bottleneck_channels})'
+                inner_str += f'HS({self.bottleneck_channels})'
 
             inner_str += f'ConvDW({self.bottleneck_channels},{self.kernel_size},{current_stride})'
             if not self.no_BN:
@@ -72,7 +72,7 @@ class SuperGhostShuffleKX(PlainNetSuperBlockClass):
             if not self.no_BN:
                 inner_str += f'BN({mid_out_channels})'
             if not self.no_relu:
-                inner_str += f'RELU({mid_out_channels})'
+                inner_str += f'HS({mid_out_channels})'
 
             if not self.no_reslink:
                 res_str = f'GhostShuffleBlock({inner_str})'
@@ -83,11 +83,11 @@ class SuperGhostShuffleKX(PlainNetSuperBlockClass):
 
             # end block add 1 * 1 point-wise again
             inner_str = ''
-            inner_str += f'GhostConv({self.out_channels},{self.out_channels},{1},{1})'
-            if not self.no_BN:
-                inner_str += f'BN({self.out_channels})'
-            if not self.no_relu:
-                inner_str += f'RELU({self.out_channels})'
+            # inner_str += f'GhostConv({self.out_channels},{self.out_channels},{1},{1})'
+            # if not self.no_BN:
+            #     inner_str += f'BN({self.out_channels})'
+            # if not self.no_relu:
+            #     inner_str += f'RELU({self.out_channels})'
 
             full_str += inner_str
             last_channels = out_channels
