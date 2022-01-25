@@ -5,13 +5,13 @@ set -e
 cd ../
 
 budget_model_size=1e6
-max_layers=18
+max_layers=20
 population_size=512
 evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 resolution=32
 epochs=1440
 
-save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M_shuffle_hs
+save_dir=../../save_dir/GhostShuffle_cifar_params2M_flops480M_shuffle_hs
 mkdir -p ${save_dir}
 
 horovodrun -np 4 -H localhost:4 python train_image_classification.py --dataset cifar10 --num_classes 10 \
@@ -22,7 +22,7 @@ horovodrun -np 4 -H localhost:4 python train_image_classification.py --dataset c
   --lr_per_256 0.1 --target_lr_per_256 0.0 --lr_mode cosine \
   --arch Masternet.py:MasterNet \
   --plainnet_struct_txt ${save_dir}/best_structure.txt \
-  --batch_size_per_gpu 128 \
+  --batch_size_per_gpu 64 \
   --save_dir ${save_dir}/cifar10_1440epochs
 
 # python train_image_classification.py --dataset cifar10 --num_classes 10 \
