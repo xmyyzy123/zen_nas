@@ -153,7 +153,7 @@ def compute_nas_score(any_plain_net, random_structure_str, gpu, args):
     """
     # compute network zero-shot proxy score
     the_model = any_plain_net(num_classes=args.num_classes, plainnet_struct=random_structure_str,
-                              no_create=False, no_reslink=False)
+                              no_create=False, no_reslink=True)
     the_model = the_model.cuda(gpu)
     try:
         if args.zero_shot_score == 'Zen':

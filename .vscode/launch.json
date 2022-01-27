@@ -15,17 +15,16 @@
                 "--zero_shot_score", "Zen",
                 "--fix_initialize",
                 "--origin",
-                "--search_space", "${workspaceFolder}/src/zen_nas/SearchSpace/search_space_ghostshuffle.py",
+                "--search_space", "${workspaceFolder}/src/zen_nas/SearchSpace/search_space_VoV.py",
                 "--budget_model_size", "1e6",
                 "--max_layers", "18",
                 "--batch_size", "64",
                 "--input_image_size", "32",
-                "--use_se",
-                "--plainnet_struct_txt", "${workspaceFolder}/save_dir/Zen_NAS_cifar_params1M/init_plainnet.txt",
+                "--plainnet_struct_txt", "${workspaceFolder}/save_dir/VoV_cifar_params1M_flops160M/init_plainnet.txt",
                 "--num_classes", "10",
                 "--evolution_max_iter", "480000",
                 "--population_size", "512",
-                "--save_dir", "${workspaceFolder}/save_dir/Zen_NAS_cifar_params1M"
+                "--save_dir", "${workspaceFolder}/save_dir/VoV_cifar_params1M_flops160M"
             ]
         }
     ]

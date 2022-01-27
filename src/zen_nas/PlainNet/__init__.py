@@ -309,3 +309,6 @@ _all_netblocks_dict_ = SuperResIDWEXKX.register_netblocks_dict(_all_netblocks_di
 
 from PlainNet import SuperGhostShuffle
 _all_netblocks_dict_ = SuperGhostShuffle.register_netblocks_dict(_all_netblocks_dict_)
+
+from PlainNet import SuperVoVKXLX
+_all_netblocks_dict_ = SuperVoVKXLX.register_netblocks_dict(_all_netblocks_dict_)

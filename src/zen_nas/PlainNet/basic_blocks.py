@@ -1882,6 +1882,418 @@ def _fuse_bn_layer_for_blocks_list_(block_list):
             else:
                 pass
 
+# VoVNetV1's OSA block: no se and reslink, last layer is 1 * 1
+
+# with reslink
+class OSAResBlock(PlainNetBasicBlockClass):
+    def __init__(self, block_list=None, in_channels=None, stride=None, no_create=False, **kwargs):
+        super(OSAResBlock, self).__init__(**kwargs)  
+        self.block_list = block_list
+        self.stride = stride
+        self.no_create = no_create
+        if not no_create:
+            self.module_list = nn.ModuleList(block_list)
+
+        if in_channels is None:
+            self.in_channels = block_list[0].in_channels
+        else:
+            self.in_channels = in_channels
+        self.out_channels = block_list[-1].out_channels
+
+        res = 1024
+        res = self.block_list[0].get_output_resolution(res)
+        self.stride = 1024 // res
+
+        self.proj = nn.Sequential(
+                nn.Conv2d(self.in_channels, self.out_channels, 1, self.stride, bias=False),
+                nn.BatchNorm2d(self.out_channels),
+                nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        if len(self.block_list) == 0:
+            return x  
+
+        # output = [x]
+        # for i, module in enumerate(self.block_list):
+        #     x = module(x)
+        #     if isinstance(module, (RELU, HS)):
+        #         output.append(x)
+        # x = torch.cat(output, dim=1)
+        # # reslink
+        # x = x + self.proj(output[0])
+        shorcut = x
+        output = []
+        count = 0
+        for _, module in enumerate(self.block_list):
+            if isinstance(module, ConvKX):
+                count += 1
+        count -= 1
+        for i, module in enumerate(self.block_list):
+            if count == 0:
+                x = torch.cat(output, dim=1)
+                count = count - 1
+            x = module(x)
+            if isinstance(module, (RELU, HS)):
+                output.append(x)
+                count = count - 1
+        # reslink
+        x = x + self.proj(shorcut)
+        return x  
+
+    def __str__(self):
+        block_str = f'OSAResBlock({self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str 
+
+    def __repr__(self):
+        block_str = f'OSAResBlock({self.block_name}|{self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str
+
+    def get_output_resolution(self, input_resolution):
+        the_res = input_resolution
+        for the_block in self.block_list:
+            the_res = the_block.get_output_resolution(the_res)
+
+        return the_res
+
+    def get_FLOPs(self, input_resolution):
+        the_res = input_resolution
+        the_flops = 0
+        for the_block in self.block_list:
+            the_flops += the_block.get_FLOPs(the_res)
+            the_res = the_block.get_output_resolution(the_res)
+        # reslink
+        the_flops += self.in_channels * self.out_channels * (the_res / self.stride) ** 2
+        return the_flops
+
+    def get_model_size(self):
+        the_size = 0
+        for the_block in self.block_list:
+            the_size += the_block.get_model_size()
+        # reslink
+        the_size += self.in_channels * self.out_channels
+        return the_size
+
+    def set_in_channels(self, channels):
+        self.in_channels = channels
+        if len(self.block_list) == 0:
+            self.out_channels = channels
+            return
+
+        self.block_list[0].set_in_channels(channels)
+        last_channels = self.block_list[0].out_channels
+        if len(self.block_list) >= 2 and \
+                (isinstance(self.block_list[0], (ConvKX, ConvDW))) and isinstance(self.block_list[1], BN):
+            self.block_list[1].set_in_channels(last_channels)
+
+        self.proj = None
+        if not self.no_create:
+            self.proj = nn.Sequential(
+                nn.Conv2d(self.in_channels, self.out_channels, 1, self.stride),
+                nn.BatchNorm2d(self.out_channels),
+                nn.ReLU(),
+            )
+            self.proj.train()
+            self.proj.requires_grad_(True)
+
+    @classmethod
+    def create_from_str(cls, struct_str, no_create=False, **kwargs):
+        assert OSAResBlock.is_instance_from_str(struct_str)
+        idx = _get_right_parentheses_index_(struct_str)
+        assert idx is not None
+        the_stride = None
+        param_str = struct_str[len('OSAResBlock('):idx]
+        # find block_name
+        tmp_idx = param_str.find('|')
+        if tmp_idx < 0:
+            tmp_block_name = f'uuid{uuid.uuid4().hex}'
+        else:
+            tmp_block_name = param_str[0:tmp_idx]
+            param_str = param_str[tmp_idx + 1:]
+
+        first_comma_index = param_str.find(',')
+        # cannot parse in_channels, missing, use default
+        if first_comma_index < 0 or not param_str[0:first_comma_index].isdigit():
+            in_channels = None
+            the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+        else:
+            in_channels = int(param_str[0:first_comma_index])
+            param_str = param_str[first_comma_index + 1:]
+            second_comma_index = param_str.find(',')
+            if second_comma_index < 0 or not param_str[0:second_comma_index].isdigit():
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+            else:
+                the_stride = int(param_str[0:second_comma_index])
+                param_str = param_str[second_comma_index + 1:]
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+
+        assert len(remaining_s) == 0
+        if the_block_list is None or len(the_block_list) == 0:
+            return None, struct_str[idx + 1:]
+        return OSAResBlock(block_list=the_block_list, in_channels=in_channels,
+                        stride=the_stride, no_create=no_create, block_name=tmp_block_name), struct_str[idx + 1:]
+
+# # ConcatBlock in OSABlock
+# class ConcatBlock(PlainNetBasicBlockClass):
+#     def __init__(self, block_list=None, in_channels=None, stride=None, no_create=False, **kwargs):
+#         super(ConcatBlock, self).__init__(**kwargs)
+#         self.block_list = block_list
+#         self.stride = stride
+#         self.no_create = no_create
+#         if not no_create:
+#             self.module_list = nn.ModuleList(block_list)
+
+#         if in_channels is None:
+#             self.in_channels = block_list[0].in_channels
+#         else:
+#             self.in_channels = in_channels
+#         self.out_channels = block_list[-1].out_channels
+
+#         res = 1024
+#         res = self.block_list[0].get_output_resolution(res)
+#         self.stride = 1024 // res
+
+#     def forward(self, x):
+#         if len(self.block_list) == 0:
+#             return x  
+
+#         output = [x]
+#         for i, module in enumerate(self.block_list):
+#             x = module(x)
+#             if isinstance(module, (RELU, HS)):
+#                 output.append(x)
+#         x = torch.cat(output, dim=1)
+#         return x  
+
+#     def __str__(self):
+#         block_str = f'ConcatBlock({self.in_channels},{self.stride},'
+#         for inner_block in self.block_list:
+#             block_str += str(inner_block)
+
+#         block_str += ')'
+#         return block_str 
+
+#     def __repr__(self):
+#         block_str = f'ConcatBlock({self.block_name}|{self.in_channels},{self.stride},'
+#         for inner_block in self.block_list:
+#             block_str += str(inner_block)
+
+#         block_str += ')'
+#         return block_str
+
+#     def get_output_resolution(self, input_resolution):
+#         the_res = input_resolution
+#         for the_block in self.block_list:
+#             the_res = the_block.get_output_resolution(the_res)
+
+#         return the_res
+
+#     def get_FLOPs(self, input_resolution):
+#         the_res = input_resolution
+#         the_flops = 0
+#         for the_block in self.block_list:
+#             the_flops += the_block.get_FLOPs(the_res)
+#             the_res = the_block.get_output_resolution(the_res)
+
+#         return the_flops
+
+#     def get_model_size(self):
+#         the_size = 0
+#         for the_block in self.block_list:
+#             the_size += the_block.get_model_size()
+        
+#         return the_size
+
+#     def set_in_channels(self, channels):
+#         self.in_channels = channels
+#         if len(self.block_list) == 0:
+#             self.out_channels = channels
+#             return
+
+#         self.block_list[0].set_in_channels(channels)
+#         last_channels = self.block_list[0].out_channels
+#         if len(self.block_list) >= 2 and \
+#                 (isinstance(self.block_list[0], (ConvKX, ConvDW))) and isinstance(self.block_list[1], BN):
+#             self.block_list[1].set_in_channels(last_channels)
+
+#     @classmethod
+#     def create_from_str(cls, struct_str, no_create=False, **kwargs):
+#         assert OSABlock.is_instance_from_str(struct_str)
+#         idx = _get_right_parentheses_index_(struct_str)
+#         assert idx is not None
+#         the_stride = None
+#         param_str = struct_str[len('ConcatBlock('):idx]
+#         # find block_name
+#         tmp_idx = param_str.find('|')
+#         if tmp_idx < 0:
+#             tmp_block_name = f'uuid{uuid.uuid4().hex}'
+#         else:
+#             tmp_block_name = param_str[0:tmp_idx]
+#             param_str = param_str[tmp_idx + 1:]
+
+#         first_comma_index = param_str.find(',')
+#         # cannot parse in_channels, missing, use default
+#         if first_comma_index < 0 or not param_str[0:first_comma_index].isdigit():
+#             in_channels = None
+#             the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+#         else:
+#             in_channels = int(param_str[0:first_comma_index])
+#             param_str = param_str[first_comma_index + 1:]
+#             second_comma_index = param_str.find(',')
+#             if second_comma_index < 0 or not param_str[0:second_comma_index].isdigit():
+#                 the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+#             else:
+#                 the_stride = int(param_str[0:second_comma_index])
+#                 param_str = param_str[second_comma_index + 1:]
+#                 the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+
+#         assert len(remaining_s) == 0
+#         if the_block_list is None or len(the_block_list) == 0:
+#             return None, struct_str[idx + 1:]
+#         return ConcatBlock(block_list=the_block_list, in_channels=in_channels,
+#                         stride=the_stride, no_create=no_create, block_name=tmp_block_name), struct_str[idx + 1:]
+
+# no reslink
+class OSABlock(PlainNetBasicBlockClass):
+    def __init__(self, block_list=None, in_channels=None, stride=None, no_create=False, **kwargs):
+        super(OSABlock, self).__init__(**kwargs)  
+        self.block_list = block_list
+        self.stride = stride
+        self.no_create = no_create
+        if not no_create:
+            self.module_list = nn.ModuleList(block_list)
+
+        if in_channels is None:
+            self.in_channels = block_list[0].in_channels
+        else:
+            self.in_channels = in_channels
+
+        # self.count = 0
+        # for module in block_list:
+        #     if isinstance(module, ConvKX):
+        #         self.count += 1
+        # self.out_channels = self.in_channels + self.count * 
+
+        res = 1024
+        res = self.block_list[0].get_output_resolution(res)
+        self.stride = 1024 // res
+
+    def forward(self, x):
+        if len(self.block_list) == 0:
+            return x  
+
+        output = []
+        count = 0
+        for _, module in enumerate(self.block_list):
+            if isinstance(module, ConvKX):
+                count += 1
+        count -= 1
+        for i, module in enumerate(self.block_list):
+            if count == 0:
+                x = torch.cat(output, dim=1)
+                count = count - 1
+            x = module(x)
+            if isinstance(module, (RELU, HS)):
+                output.append(x)
+                count = count - 1
+        return x  
+
+    def __str__(self):
+        block_str = f'OSABlock({self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str 
+
+    def __repr__(self):
+        block_str = f'OSABlock({self.block_name}|{self.in_channels},{self.stride},'
+        for inner_block in self.block_list:
+            block_str += str(inner_block)
+
+        block_str += ')'
+        return block_str
+
+    def get_output_resolution(self, input_resolution):
+        the_res = input_resolution
+        for the_block in self.block_list:
+            the_res = the_block.get_output_resolution(the_res)
+
+        return the_res
+
+    def get_FLOPs(self, input_resolution):
+        the_res = input_resolution
+        the_flops = 0
+        for the_block in self.block_list:
+            the_flops += the_block.get_FLOPs(the_res)
+            the_res = the_block.get_output_resolution(the_res)
+
+        return the_flops
+
+    def get_model_size(self):
+        the_size = 0
+        for the_block in self.block_list:
+            the_size += the_block.get_model_size()
+        
+        return the_size
+
+    def set_in_channels(self, channels):
+        self.in_channels = channels
+        if len(self.block_list) == 0:
+            self.out_channels = channels
+            return
+
+        self.block_list[0].set_in_channels(channels)
+        last_channels = self.block_list[0].out_channels
+        if len(self.block_list) >= 2 and \
+                (isinstance(self.block_list[0], (ConvKX, ConvDW))) and isinstance(self.block_list[1], BN):
+            self.block_list[1].set_in_channels(last_channels)
+
+    @classmethod
+    def create_from_str(cls, struct_str, no_create=False, **kwargs):
+        assert OSABlock.is_instance_from_str(struct_str)
+        idx = _get_right_parentheses_index_(struct_str)
+        assert idx is not None
+        the_stride = None
+        param_str = struct_str[len('OSABlock('):idx]
+        # find block_name
+        tmp_idx = param_str.find('|')
+        if tmp_idx < 0:
+            tmp_block_name = f'uuid{uuid.uuid4().hex}'
+        else:
+            tmp_block_name = param_str[0:tmp_idx]
+            param_str = param_str[tmp_idx + 1:]
+
+        first_comma_index = param_str.find(',')
+        # cannot parse in_channels, missing, use default
+        if first_comma_index < 0 or not param_str[0:first_comma_index].isdigit():
+            in_channels = None
+            the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+        else:
+            in_channels = int(param_str[0:first_comma_index])
+            param_str = param_str[first_comma_index + 1:]
+            second_comma_index = param_str.find(',')
+            if second_comma_index < 0 or not param_str[0:second_comma_index].isdigit():
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+            else:
+                the_stride = int(param_str[0:second_comma_index])
+                param_str = param_str[second_comma_index + 1:]
+                the_block_list, remaining_s = _create_netblock_list_from_str_(param_str, no_create=no_create)
+
+        assert len(remaining_s) == 0
+        if the_block_list is None or len(the_block_list) == 0:
+            return None, struct_str[idx + 1:]
+        return OSABlock(block_list=the_block_list, in_channels=in_channels,
+                        stride=the_stride, no_create=no_create, block_name=tmp_block_name), struct_str[idx + 1:]
+
 
 def register_netblocks_dict(netblocks_dict: dict):
     """add all basic layer classes to dict"""
@@ -1910,6 +2322,8 @@ def register_netblocks_dict(netblocks_dict: dict):
         'Sequential': Sequential,
         'SE': SE,
         'Swish': Swish,
+        'OSABlock': OSABlock,
+        'OSAResBlock': OSAResBlock
     }
     netblocks_dict.update(this_py_file_netblocks_dict)
     return netblocks_dict
