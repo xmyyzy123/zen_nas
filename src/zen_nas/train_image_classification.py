@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
+from torch.utils.tensorboard import SummaryWriter
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     import horovod.torch as hvd
@@ -454,7 +455,7 @@ def config_model_optimizer_hvd_and_apex(model, optimizer, opt):
 
 
 # pylint: disable=too-many-locals,too-many-arguments
-def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_train_samples, no_acc_eval=False):
+def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_train_samples, no_acc_eval=False, tb_writer=None):
     """ model training
 
         :param train_loader: train dataset loader
@@ -468,6 +469,8 @@ def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_t
     """
 
     info = {}
+
+    tags = ["train_loss", "train_accuracy1", "train_accuracy5", "learning_rate"]
 
     losses = AverageMeter('Loss ', ':6.4g')
     top1 = AverageMeter('Acc@1 ', ':6.2f')
@@ -568,6 +571,10 @@ def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_t
         if i % opt.print_freq == 0 and opt.rank == 0:
             info_str = f'Train epoch={epoch}, i={i}, loss={float(loss):4g},' \
                          f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%,lr={current_lr:4g}'
+            tb_writer.add_scalar(tags[0], loss, epoch) 
+            tb_writer.add_scalar(tags[1], acc1[0], epoch)
+            tb_writer.add_scalar(tags[2], acc5[0], epoch)
+            tb_writer.add_scalar(tags[3], current_lr, epoch)
             logging.info(info_str)
 
     # if distributed, sync
@@ -585,7 +592,7 @@ def train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_t
 
 
 # pylint: disable=too-many-locals
-def validate(val_loader, model, criterion, opt, epoch='N/A'):
+def validate(val_loader, model, criterion, opt, epoch='N/A', tb_writer=None):
     """ model evaluation
 
         :param val_loader: validate dataset loader
@@ -593,6 +600,7 @@ def validate(val_loader, model, criterion, opt, epoch='N/A'):
         :param criterion: loss criterion
         :return:
     """
+    tags = ["val_loss", "val_accuracy1", "val_accuracy5"]
 
     losses = AverageMeter('Loss ', ':6.4g')
     top1 = AverageMeter('Acc@1 ', ':6.2f')
@@ -631,7 +639,10 @@ def validate(val_loader, model, criterion, opt, epoch='N/A'):
 
             if i % opt.print_freq == 0 and opt.rank == 0:
                 info_str = f'Eval epoch={epoch}, i={i}, loss={float(loss):4g},' \
-                             f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%'
+                             f'acc1={float(acc1[0]):4g}%, acc5={float(acc5[0]):4g}%'  
+                tb_writer.add_scalar(tags[0], loss, epoch) 
+                tb_writer.add_scalar(tags[1], acc1[0], epoch)
+                tb_writer.add_scalar(tags[2], acc5[0], epoch)
                 logging.info(info_str)
 
     top1_acc_avg = top1.avg
@@ -672,6 +683,12 @@ def train_all_epochs(opt, model, optimizer, train_sampler, train_loader, criteri
         :param save_params (bool): save model parameters
         :return:
     """
+    tb_writer=None
+    if opt.rank == 0:
+        tb_writer = SummaryWriter(log_dir=os.path.join(opt.save_dir, "runs/logs/"))
+        init_img = torch.zeros((1, 3, opt.input_image_size, opt.input_image_size), device='cuda:0' if torch.cuda.is_available() else 'cpu')
+        tb_writer.add_graph(model, init_img)
+        tags = ["best_acc1", "best_acc5"]
 
     timer_start = time.time()
 
@@ -694,14 +711,14 @@ def train_all_epochs(opt, model, optimizer, train_sampler, train_loader, criteri
         # train for one epoch
         training_timer_start = time.time()
         _ = train_one_epoch(train_loader, model, criterion, optimizer, epoch, opt, num_train_samples,
-                            no_acc_eval=no_acc_eval)
+                            no_acc_eval=no_acc_eval, tb_writer=tb_writer)
 
         training_status_info['training_elasped_time'] += time.time() - training_timer_start
 
         # evaluate on validation set
         if val_loader is not None:
             validation_timer_start = time.time()
-            validate_info = validate(val_loader, model, criterion, opt, epoch=epoch)
+            validate_info = validate(val_loader, model, criterion, opt, epoch=epoch, tb_writer=tb_writer)
             training_status_info['validation_elasped_time'] += time.time() - validation_timer_start
             acc1 = validate_info['top1_acc']
             acc5 = validate_info['top5_acc']
@@ -729,6 +746,10 @@ def train_all_epochs(opt, model, optimizer, train_sampler, train_loader, criteri
                      training_status_info['best_acc1'], training_status_info['best_acc1_at_epoch'],
                      training_status_info['best_acc5'], training_status_info['best_acc5_at_epoch'])
 
+        if opt.rank == 0:
+            tb_writer.add_scalar(tags[0], training_status_info['best_acc1'], epoch)
+            tb_writer.add_scalar(tags[1], training_status_info['best_acc5'], epoch)
+        
         # ----- save latest epoch -----#
         if save_params and (opt.rank == 0 or save_all_ranks) and \
                 ((epoch + 1) % opt.save_freq == 0 or epoch + 1 == opt.epochs):
