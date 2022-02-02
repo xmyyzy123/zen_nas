@@ -4,25 +4,25 @@ set -e
 
 cd ../
 
-budget_model_size=2e6
-budget_flops=500e6
-max_layers=40
+budget_model_size=1e6
+budget_flops=160e6
+max_layers=18
 population_size=512
 evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 
-
-save_dir=../../save_dir/VoV_cifar_params2M
+save_dir=../../save_dir/NASWOT_VoV_cifar_params1M_flops160M
 mkdir -p ${save_dir}
 
 echo "SuperConvK3BNRELU(3,8,1,1)SuperVoVK3L3(8,16,1,8,1)SuperVoVK3L3(16,32,2,16,1)SuperVoVK3L3(32,64,2,32,1)SuperVoVK3L3(64,64,2,32,1)SuperConvK1BNRELU(64,128,1,1)" \
 > ${save_dir}/init_plainnet.txt
 
 python evolution_search.py --gpu 0 \
-  --zero_shot_score Zen \
+  --zero_shot_score NASWOT \
   --fix_initialize \
   --origin \
   --search_space SearchSpace/search_space_VoV.py \
   --budget_model_size ${budget_model_size} \
+  --budget_flops ${budget_flops} \
   --max_layers ${max_layers} \
   --batch_size 64 \
   --input_image_size 32 \
@@ -62,5 +62,3 @@ python analyze_model.py \
 #   --plainnet_struct_txt ${save_dir}/best_structure.txt \
 #   --batch_size_per_gpu 64 \
 #   --save_dir ${save_dir}/cifar100_1440epochs
-
-#  --budget_flops ${budget_flops} \
