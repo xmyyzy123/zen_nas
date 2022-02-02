@@ -269,6 +269,9 @@ def main(args, argv):
             max_score = max(popu_zero_shot_score_list)
             min_score = min(popu_zero_shot_score_list)
             elasp_time = time.time() - start_timer
+            max_zero_shot_score = max(popu_zero_shot_score_list)
+            tmp_idx = popu_zero_shot_score_list.index(max_zero_shot_score)
+            logging.info("structure: %s", popu_structure_list[tmp_idx])
             logging.info('loop_count=%d/%d,max_score=%4f, min_score=%.4f, time=%.4fh',
                          loop_count, args.evolution_max_iter, max_score, min_score, elasp_time / 3600)
             logging.info('Computing model score has elapsed %.4f hours', acc_time / 3600)
