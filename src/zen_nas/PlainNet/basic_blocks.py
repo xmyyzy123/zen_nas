@@ -648,6 +648,8 @@ class ConvKX(PlainNetBasicBlockClass):
 
     def set_in_channels(self, channels):
         self.in_channels = channels
+        # if self.stride == 2:
+        #     self.out_channels = channels * 2
         if not self.no_create:
             self.netblock = nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,
                                       kernel_size=self.kernel_size, stride=self.stride,
@@ -2190,21 +2192,10 @@ class OSABlock(PlainNetBasicBlockClass):
         if len(self.block_list) == 0:
             return x  
 
-        output = []
-        count = 0
-        for _, module in enumerate(self.block_list):
-            if isinstance(module, ConvKX):
-                count += 1
-        count -= 1
-        for i, module in enumerate(self.block_list):
-            if count == 0:
-                x = torch.cat(output, dim=1)
-                count = count - 1
-            x = module(x)
-            if isinstance(module, (RELU, HS)):
-                output.append(x)
-                count = count - 1
-        return x  
+        output = x
+        for inner_block in self.block_list:
+            output = inner_block(output)
+        return output 
 
     def __str__(self):
         block_str = f'OSABlock({self.in_channels},{self.stride},'

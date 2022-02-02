@@ -30,6 +30,7 @@ class SuperVoVKXLX(PlainNetSuperBlockClass):
         self.stride = stride
         self.bottleneck_channels = bottleneck_channels
         self.sub_layers = sub_layers
+        self.osa_layers = osa_layers
         self.kernel_size = kernel_size
         self.no_create = no_create
         self.no_reslink = no_reslink
@@ -39,6 +40,10 @@ class SuperVoVKXLX(PlainNetSuperBlockClass):
         if self.use_se:
             print('---debug use_se in ' + str(self))
         
+        # if stride == 2:
+        #     self.bottleneck_channels = self.in_channels * 2
+        #     self.out_channels = self.in_channels * 2
+
         full_str = ''
         last_channels = in_channels
         current_stride = stride
@@ -61,7 +66,10 @@ class SuperVoVKXLX(PlainNetSuperBlockClass):
             next_in_chs = osa_layers * self.bottleneck_channels
 
             # lower the dimensions
-            inner_str += f'ConvKX({next_in_chs},{self.out_channels},{1},{1})'
+            if not self.no_reslink:
+                inner_str += f'ConvKX({next_in_chs},{self.out_channels},{1},{1})'
+            else:
+                inner_str += f'ConvKX({bottleneck_channels},{self.out_channels},{1},{1})'
             if not self.no_BN:
                 inner_str += f'BN({self.out_channels})'
             if not self.no_relu:

@@ -138,7 +138,10 @@ class MasterNet(PlainNet.PlainNet):
         num_layers = 0
         for block in self.block_list:
             assert isinstance(block, super_blocks.PlainNetSuperBlockClass)
-            num_layers += block.sub_layers
+            if hasattr(block, 'osa_layers'):
+                num_layers += block.sub_layers * block.osa_layers
+            else:
+                num_layers += block.sub_layers
         return num_layers
 
     def replace_block(self, block_id, new_block):

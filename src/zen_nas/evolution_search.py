@@ -14,6 +14,7 @@ try:
     import global_utils
     import Masternet
     import PlainNet
+    from PlainNet import _get_right_parentheses_index_
     # from tqdm import tqdm
     from ZeroShotProxy import compute_zen_score, compute_te_nas_score, \
         compute_syncflow_score, compute_gradnorm_score, compute_NASWOT_score
@@ -63,7 +64,87 @@ def parse_cmd_options(argv):
     module_opt, _ = parser.parse_known_args(argv)
     return module_opt
 
+def _get_left_parentheses_index_(struct_str):
+    """get the position of the first left parenthese in string"""
 
+    for index, single_char in enumerate(struct_str):
+        if single_char == '(':
+            return index
+
+    return None
+
+def extend_downsample_width(struct_str):
+    split_layer_threshold = 6
+    struct_str = struct_str.replace(' ', '')
+    result_struct_str = ''
+    last_channels = None
+    while len(struct_str):
+        left_bracket_idx = _get_left_parentheses_index_(struct_str)
+        right_bracket_idx = _get_right_parentheses_index_(struct_str)
+        assert left_bracket_idx is not None and right_bracket_idx is not None
+        block_name = struct_str[:left_bracket_idx]
+        para_str = struct_str[left_bracket_idx + 1:right_bracket_idx]
+        struct_str = '' if right_bracket_idx + 1 == len(struct_str) else struct_str[right_bracket_idx + 1:]
+
+        result_struct_str += block_name + '('
+
+        param_str_split = para_str.split(',')
+        if len(param_str_split) == 5: # has bottleneck
+            in_channels = int(param_str_split[0])
+            out_channels = int(param_str_split[1])
+            stride = int(param_str_split[2])
+            bottleneck_channels = int(param_str_split[3])
+            sub_layers = int(param_str_split[4])
+
+            # make consistent between last channel and in channel
+            if last_channels != None:
+                in_channels = last_channels
+
+            # extend width if downsample
+            if stride == 2:
+                out_channels = max(in_channels * 2, out_channels)
+                bottleneck_channels = max(in_channels * 2, bottleneck_channels)
+            else:
+                bottleneck_channels = max(in_channels, bottleneck_channels)
+
+            # split block
+            if sub_layers >= split_layer_threshold:
+                new_sublayers_1 = split_layer_threshold // 2
+                new_sublayers_2 = sub_layers - new_sublayers_1
+                new_block_str1 = f'{in_channels},{out_channels},'\
+                                 f'{stride},{bottleneck_channels},{new_sublayers_1})'
+
+                new_block_str2 = block_name + f'({out_channels},{out_channels},'\
+                                              f'{1},{bottleneck_channels},{new_sublayers_2})'
+                result_struct_str += new_block_str1 + new_block_str2
+            else:
+                result_struct_str += str(in_channels) + ',' + str(out_channels) + ',' + str(stride) + ',' + str(bottleneck_channels) + ',' + str(sub_layers) + ')'
+        elif len(param_str_split) == 4:
+            in_channels = int(param_str_split[0])
+            out_channels = int(param_str_split[1])
+            stride = int(param_str_split[2])
+            sub_layers = int(param_str_split[3])
+            if last_channels != None:
+                in_channels = last_channels
+            if stride == 2:
+                out_channels = max(in_channels * 2, out_channels)
+
+            # split block
+            if sub_layers >= split_layer_threshold:
+                new_sublayers_1 = split_layer_threshold // 2
+                new_sublayers_2 = sub_layers - new_sublayers_1
+                new_block_str1 = f'{in_channels},{out_channels},'\
+                                 f'{stride},{new_sublayers_1})'
+
+                new_block_str2 = block_name + f'({out_channels},{out_channels},'\
+                                              f'{1},{new_sublayers_2})'
+                result_struct_str += new_block_str1 + new_block_str2
+            else:
+                result_struct_str += str(in_channels) + ',' + str(out_channels) + ',' + str(stride) + ',' + str(sub_layers) + ')'
+
+        last_channels = out_channels
+
+    return result_struct_str
 # pylint: disable=too-many-locals
 def get_new_random_structure_str(any_plain_net, structure_str, num_classes, get_search_space_func,
                                  num_replaces=1):
@@ -88,29 +169,70 @@ def get_new_random_structure_str(any_plain_net, structure_str, num_classes, get_
         to_search_student_blocks_list = [x for sublist in to_search_student_blocks_list_list for x in sublist]
         new_student_block_str = random.choice(to_search_student_blocks_list)
 
-        if len(new_student_block_str) > 0:
-            new_student_block = PlainNet.create_netblock_list_from_str(new_student_block_str, no_create=True)
-            assert len(new_student_block) == 1
-            new_student_block = new_student_block[0]
-            if random_id > 0:
-                last_block_out_channels = the_net.block_list[random_id - 1].out_channels
-                new_student_block.set_in_channels(last_block_out_channels)
-            the_net.block_list[random_id] = new_student_block
+        if hasattr(the_net.block_list[random_id],'bottleneck_channels'):
+            original_block_str = type(the_net.block_list[random_id]).__name__ + \
+                                '(' + \
+                                str(the_net.block_list[random_id].in_channels) + ',' + \
+                                str(the_net.block_list[random_id].out_channels) + ',' + \
+                                str(the_net.block_list[random_id].stride) + ',' + \
+                                str(the_net.block_list[random_id].bottleneck_channels) + ',' + \
+                                str(the_net.block_list[random_id].sub_layers) + \
+                                ')'
         else:
-            # replace with empty block
-            the_net.block_list[random_id] = None
+            original_block_str = type(the_net.block_list[random_id]).__name__ + \
+                                '(' + \
+                                str(the_net.block_list[random_id].in_channels) + ',' + \
+                                str(the_net.block_list[random_id].out_channels) + ',' + \
+                                str(the_net.block_list[random_id].stride) + ',' + \
+                                str(the_net.block_list[random_id].sub_layers) + \
+                                ')'
 
-    # adjust channels and remove empty layer
-    tmp_new_block_list = [x for x in the_net.block_list if x is not None]
-    last_channels = the_net.block_list[0].out_channels
-    for block in tmp_new_block_list[1:]:
-        block.set_in_channels(last_channels)
-        last_channels = block.out_channels
-    the_net.block_list = tmp_new_block_list
+        structure_str = structure_str.replace(original_block_str, new_student_block_str)
 
-    assert hasattr(the_net, 'split')
-    new_random_structure_str = the_net.split(split_layer_threshold=6)
-    return new_random_structure_str
+        structure_str = extend_downsample_width(structure_str)
+
+
+    # the_net = any_plain_net(num_classes=num_classes, plainnet_struct=structure_str, no_create=True)
+    # assert isinstance(the_net, PlainNet.PlainNet)
+    # selected_random_id_set = set()
+    # for _ in range(num_replaces):
+    #     random_id = random.randint(0, len(the_net.block_list) - 1)
+    #     if random_id in selected_random_id_set:
+    #         continue
+    #     selected_random_id_set.add(random_id)
+    #     to_search_student_blocks_list_list = get_search_space_func(the_net.block_list, random_id)
+
+    #     to_search_student_blocks_list = [x for sublist in to_search_student_blocks_list_list for x in sublist]
+    #     new_student_block_str = random.choice(to_search_student_blocks_list)
+
+    #     new_student_block_str = extend_downsample_width(new_student_block_str)
+
+    #     if len(new_student_block_str) > 0:
+    #         new_student_block = PlainNet.create_netblock_list_from_str(new_student_block_str, no_create=True)
+    #         assert len(new_student_block) == 1
+    #         new_student_block = new_student_block[0]
+    #         if random_id > 0:
+    #             last_block_out_channels = the_net.block_list[random_id - 1].out_channels
+    #             new_student_block.set_in_channels(last_block_out_channels)
+    #         the_net.block_list[random_id] = new_student_block
+    #     else:
+    #         # replace with empty block
+    #         the_net.block_list[random_id] = None
+
+    # # adjust channels and remove empty layer
+    # tmp_new_block_list = [x for x in the_net.block_list if x is not None]
+    # last_channels = the_net.block_list[0].out_channels
+    # for block in tmp_new_block_list[1:]:
+    #     block.set_in_channels(last_channels)
+    #     last_channels = block.out_channels
+    # the_net.block_list = tmp_new_block_list
+
+    # assert hasattr(the_net, 'split')
+    # new_random_structure_str = the_net.split(split_layer_threshold=6)
+
+    # new_random_structure_str = extend_downsample_width(new_random_structure_str)
+
+    return structure_str
 
 
 def get_splitted_structure_str(any_plain_net, structure_str, num_classes):
@@ -269,6 +391,9 @@ def main(args, argv):
             max_score = max(popu_zero_shot_score_list)
             min_score = min(popu_zero_shot_score_list)
             elasp_time = time.time() - start_timer
+            max_zero_shot_score = max(popu_zero_shot_score_list)
+            tmp_idx = popu_zero_shot_score_list.index(max_zero_shot_score)
+            logging.info("structure: %s", popu_structure_list[tmp_idx])
             logging.info('loop_count=%d/%d,max_score=%4f, min_score=%.4f, time=%.4fh',
                          loop_count, args.evolution_max_iter, max_score, min_score, elasp_time / 3600)
             logging.info('Computing model score has elapsed %.4f hours', acc_time / 3600)

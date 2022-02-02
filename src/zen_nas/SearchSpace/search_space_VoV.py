@@ -14,6 +14,30 @@ try:
 except ImportError:
     print('fail to import zen_nas modules')
 
+# seach_space_block_type_list_list = [
+#     [SuperVoVKXLX.SuperVoVK3L1, 
+#      SuperVoVKXLX.SuperVoVK3L2, 
+#      SuperVoVKXLX.SuperVoVK3L3,
+#      SuperVoVKXLX.SuperVoVK3L4,
+#      SuperVoVKXLX.SuperVoVK3L5],
+# ]
+
+# __block_type_round_channels_base_dict__ = {
+#     SuperVoVKXLX.SuperVoVK3L1: 8,
+#     SuperVoVKXLX.SuperVoVK3L2: 8,
+#     SuperVoVKXLX.SuperVoVK3L3: 8,
+#     SuperVoVKXLX.SuperVoVK3L4: 8,
+#     SuperVoVKXLX.SuperVoVK3L5: 8,
+# }
+
+# __block_type_min_channels_base_dict__ = {
+#     SuperVoVKXLX.SuperVoVK3L1: 8,
+#     SuperVoVKXLX.SuperVoVK3L2: 8,
+#     SuperVoVKXLX.SuperVoVK3L3: 8,
+#     SuperVoVKXLX.SuperVoVK3L4: 8,
+#     SuperVoVKXLX.SuperVoVK3L5: 8,
+# }
+
 seach_space_block_type_list_list = [
     [SuperVoVKXLX.SuperVoVK3L1, 
      SuperVoVKXLX.SuperVoVK3L2, 
@@ -68,13 +92,12 @@ __block_type_min_channels_base_dict__ = {
     SuperVoVKXLX.SuperVoVK7L5: 8,
 }
 
-
 def get_select_student_channels_list(out_channels):
     """generate all possible channels"""
     the_list = [out_channels * 2.5, out_channels * 2, out_channels * 1.5, out_channels * 1.25,
                 out_channels,
                 out_channels / 1.25, out_channels / 1.5, out_channels / 2, out_channels / 2.5]
-    the_list = [max(8, x) for x in the_list]
+    the_list = [min(2048, max(8, x)) for x in the_list]
     the_list = [global_utils.smart_round(x, base=8) for x in the_list]
     the_list = list(set(the_list))
     the_list.sort(reverse=True)
@@ -143,6 +166,12 @@ def gen_search_space(block_list, block_id):
                         continue
                     if student_sublayers <= 0:  # no empty layer
                         continue
+                    if the_block.stride == 2:
+                        student_out_channels = max(the_block.in_channels * 2, student_out_channels)
+                        student_bottleneck_channels = max(the_block.in_channels * 2, student_bottleneck_channels)
+                    else:
+                        #student_out_channels = max(the_block.in_channels * 2, student_out_channels)
+                        student_bottleneck_channels = max(the_block.in_channels, student_bottleneck_channels)
                     tmp_block_str = student_block_type.__name__ + f'({the_block.in_channels},{student_out_channels},'\
                                                                      f'{the_block.stride},{student_bottleneck_channels},'\
                                                                      f'{student_sublayers})'
