@@ -34,16 +34,20 @@ def parse_cmd_options(argv):
 PATH = './ZenNet'
 
 if __name__ == '__main__':
+    # opt = parse_cmd_options(sys.argv)
+
+    # gpu = opt.gpu
+
+    # model_plainnet_str_txt = os.path.join(PATH, opt.plain_structure)
+    # with open(model_plainnet_str_txt, 'r', encoding='utf8') as fid:
+    #     model_plainnet_str = fid.readline().strip()
+
+    # Any_Plain_Net = Masternet.MasterNet
+
     opt = parse_cmd_options(sys.argv)
-
     gpu = opt.gpu
+    any_plain_net = Masternet.MasterNet
 
-    model_plainnet_str_txt = os.path.join(PATH, opt.plain_structure)
-    with open(model_plainnet_str_txt, 'r', encoding='utf8') as fid:
-        model_plainnet_str = fid.readline().strip()
-
-    Any_Plain_Net = Masternet.MasterNet
-
-    the_nas_score = compute_nas_score(Any_Plain_Net, model_plainnet_str, gpu, opt)
+    the_nas_score = compute_nas_score(any_plain_net, opt.plain_structure, gpu, opt)
 
     print(f'zen-score={the_nas_score:.4g}')
