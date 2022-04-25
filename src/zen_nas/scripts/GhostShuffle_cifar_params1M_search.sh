@@ -4,17 +4,19 @@ set -e
 
 cd ../
 
-budget_model_size=1e6
+budget_model_size=3e6
 budget_flops=160e6
+budget_latency=6e-3
 max_layers=18
 population_size=512
 evolution_max_iter=480000  # we suggest evolution_max_iter=480000 for
 
 
-save_dir=../../save_dir/GhostShuffle_cifar_params1M_flops160M
+save_dir=../../save_dir/GhostShuffle_cifar_6ms_cudacync_onelayer
 mkdir -p ${save_dir}
 
-echo "SuperConvK3BNRELU(3,8,1,1)SuperGhostShuffleK3(8,16,1,8,1)SuperGhostShuffleK3(16,32,2,16,1)SuperGhostShuffleK3(32,64,2,32,1)SuperGhostShuffleK3(64,64,2,32,1)SuperConvK1BNRELU(64,128,1,1)" \
+
+echo "SuperConvK3BNRELU(3,32,2,1)SuperGhostShuffleK3(32,64,2,32,1)SuperGhostShuffleK3(64,128,2,64,1)SuperGhostShuffleK3(128,256,2,128,1)SuperGhostShuffleK3(256,512,2,256,1)SuperConvK1BNRELU(512,128,1,1)" \
 > ${save_dir}/init_plainnet.txt
 
 python evolution_search.py --gpu 0 \
@@ -22,11 +24,9 @@ python evolution_search.py --gpu 0 \
   --fix_initialize \
   --origin \
   --search_space SearchSpace/search_space_ghostshuffle.py \
-  --budget_model_size ${budget_model_size} \
-  --budget_flops ${budget_flops} \
+  --budget_latency ${budget_latency} \
   --max_layers ${max_layers} \
   --batch_size 64 \
-  --use_se \
   --input_image_size 32 \
   --plainnet_struct_txt ${save_dir}/init_plainnet.txt \
   --num_classes 10 \
@@ -64,3 +64,6 @@ python analyze_model.py \
 #   --plainnet_struct_txt ${save_dir}/best_structure.txt \
 #   --batch_size_per_gpu 64 \
 #   --save_dir ${save_dir}/cifar100_1440epochs
+
+#  --budget_model_size ${budget_model_size} \
+#  --budget_flops ${budget_flops} \

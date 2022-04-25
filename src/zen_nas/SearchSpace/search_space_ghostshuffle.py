@@ -38,7 +38,7 @@ def get_select_student_channels_list(out_channels):
     the_list = [out_channels * 2.5, out_channels * 2, out_channels * 1.5, out_channels * 1.25,
                 out_channels,
                 out_channels / 1.25, out_channels / 1.5, out_channels / 2, out_channels / 2.5]
-    the_list = [max(8, x) for x in the_list]
+    the_list = [min(2048, max(8, x)) for x in the_list]
     the_list = [global_utils.smart_round(x, base=8) for x in the_list]
     the_list = list(set(the_list))
     the_list.sort(reverse=True)

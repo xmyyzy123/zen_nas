@@ -16,7 +16,7 @@ except ImportError:
 def parse_cmd_options(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=16, help='number of instances in one mini-batch.')
+    parser.add_argument('--batch_size', type=int, default=1, help='number of instances in one mini-batch.')
     parser.add_argument('--input_image_size', type=int, default=224,
                         help='resolution of input image, usually 32 for CIFAR and 224 for ImageNet.')
     parser.add_argument('--repeat_times', type=int, default=32)

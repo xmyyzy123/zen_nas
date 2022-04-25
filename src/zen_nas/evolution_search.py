@@ -132,10 +132,10 @@ def get_latency(any_plain_net, random_structure_str, gpu, args):
                               no_create=False, no_reslink=False)
     if gpu is not None:
         the_model = the_model.cuda(gpu)
-    the_latency = benchmark_network_latency.get_model_latency(model=the_model, batch_size=args.batch_size,
-                                                              resolution=args.input_image_size,
+    the_latency = benchmark_network_latency.get_model_latency(model=the_model, batch_size=1,#args.batch_size,
+                                                              resolution=640,
                                                               in_channels=3, gpu=gpu, repeat_times=1,
-                                                              fp16=True)
+                                                              fp16=False)
     _ = the_model.cpu()
     del the_model
     torch.cuda.empty_cache()

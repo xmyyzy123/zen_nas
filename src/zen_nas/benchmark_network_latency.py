@@ -121,10 +121,11 @@ def get_model_latency(model, batch_size, resolution, in_channels, gpu, repeat_ti
     with torch.no_grad():
         for _ in range(warmup_times):
             _ = model(the_image)
+        torch.cuda.synchronize(device=device)
         start_timer = time.time()
         for _ in range(repeat_times):
             _ = model(the_image)
-    # torch.cuda.synchronize(device=device)
+    torch.cuda.synchronize(device=device)
     end_timer = time.time()
     the_latency = (end_timer - start_timer) / float(repeat_times) / batch_size
     return the_latency

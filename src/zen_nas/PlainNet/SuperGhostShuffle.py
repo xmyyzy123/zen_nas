@@ -61,6 +61,19 @@ class SuperGhostShuffleKX(PlainNetSuperBlockClass):
             # if not self.no_relu:
             #     inner_str += f'RELU({self.bottleneck_channels})'
 
+            # # second dw
+            # inner_str += f'GhostConv({bottleneck_channels},{self.bottleneck_channels},{1},{1})'
+            # if not self.no_BN:
+            #     inner_str += f'BN({self.bottleneck_channels})'
+            # if not self.no_relu:
+            #     inner_str += f'RELU({self.bottleneck_channels})'
+
+            # inner_str += f'ConvDW({self.bottleneck_channels},{1},{1})'
+            # if not self.no_BN:
+            #     inner_str += f'BN({self.bottleneck_channels})'
+            # if not self.no_relu:
+            #     inner_str += f'RELU({self.bottleneck_channels})'
+
             # use se
             if self.use_se:
                 inner_str += f'SE({self.bottleneck_channels})'
